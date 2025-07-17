@@ -1,6 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { uploadVideo, getVideos, likeVideo, streamVideo, getVideoDetails } from '../controllers/video.controller';
+import { 
+  uploadVideo, 
+  getVideos, 
+  likeVideo, 
+  streamVideo, 
+  getVideoDetails,
+  addToWatchHistory,
+  getWatchHistory,
+  clearWatchHistory,
+  removeFromWatchHistory
+} from '../controllers/video.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -40,6 +50,12 @@ router.post('/upload', authenticateToken, upload.fields([{ name: 'video', maxCou
 router.get('/', getVideos);
 router.post('/:videoId/like', authenticateToken, likeVideo);
 router.get('/:videoId', streamVideo);
-router.get('/details/:videoId', getVideoDetails)
+router.get('/details/:videoId', getVideoDetails);
+
+// Watch history routes
+router.post('/:videoId/watch', authenticateToken, addToWatchHistory);
+router.get('/watch-history/user', authenticateToken, getWatchHistory);
+router.delete('/watch-history/clear', authenticateToken, clearWatchHistory);
+router.delete('/watch-history/:videoId', authenticateToken, removeFromWatchHistory);
 
 export default router;

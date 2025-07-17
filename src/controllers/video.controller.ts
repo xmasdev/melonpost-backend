@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import Video from '../models/video.model';
+import User from '../models/user.model';
 import fs from 'fs';
 import path from 'path';
 import { authService } from '../services/auth.service';
@@ -154,5 +155,171 @@ export const streamVideo: RequestHandler = async (req, res) => {
     await video.save();
   } catch (error) {
     res.status(500).json({ message: 'Error streaming video', error });
+  }
+};
+
+// Add video to user's watch history
+export const addToWatchHistory: RequestHandler = async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const { watchDuration } = req.body; // How much of the video was watched (in seconds)
+    const userId = (req as any).user.id;
+
+    // Validate video exists
+    const video = await Video.findById(videoId);
+    if (!video) {
+      res.status(404).json({ message: 'Video not found' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Check if video is already in watch history
+    const existingEntryIndex = user.watchHistory.findIndex(
+      item => item.video.toString() === videoId
+    );
+
+    if (existingEntryIndex !== -1) {
+      // Update existing entry
+      user.watchHistory[existingEntryIndex].watchedAt = new Date();
+      user.watchHistory[existingEntryIndex].watchDuration = Math.max(
+        user.watchHistory[existingEntryIndex].watchDuration,
+        watchDuration || 0
+      );
+    } else {
+      // Add new entry to watch history
+      user.watchHistory.unshift({
+        video: videoId as any,
+        watchedAt: new Date(),
+        watchDuration: watchDuration || 0
+      });
+
+      // Keep only the last 100 videos in watch history
+      if (user.watchHistory.length > 100) {
+        user.watchHistory = user.watchHistory.slice(0, 100);
+      }
+    }
+
+    await user.save();
+
+    res.json({ message: 'Added to watch history' });
+  } catch (error) {
+    console.error('Error adding to watch history:', error);
+    res.status(500).json({ message: 'Error adding to watch history', error });
+  }
+};
+
+// Get user's watch history
+export const getWatchHistory: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const user = await User.findById(userId)
+      .populate({
+        path: 'watchHistory.video',
+        select: 'title description thumbnailUrl duration views uploader createdAt'
+      });
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Filter out any null videos (in case a video was deleted)
+    const validWatchHistory = user.watchHistory.filter(item => item.video);
+
+    // Paginate the results
+    const paginatedHistory = validWatchHistory.slice(skip, skip + limitNum);
+
+    // Enhance each video with uploader avatar information
+    const enhancedHistory = await Promise.all(
+      paginatedHistory.map(async (item) => {
+        const video = item.video as any; // Cast to any to access populated fields
+        const uploaderUser = await User.findOne({ username: video.uploader }).select('avatar');
+        return {
+          video: {
+            _id: video._id,
+            title: video.title,
+            description: video.description,
+            thumbnailUrl: video.thumbnailUrl,
+            duration: video.duration,
+            views: video.views,
+            uploader: video.uploader,
+            uploaderAvatar: uploaderUser ? uploaderUser.avatar : null,
+            createdAt: video.createdAt
+          },
+          watchedAt: item.watchedAt,
+          watchDuration: item.watchDuration
+        };
+      })
+    );
+
+    res.json({
+      watchHistory: enhancedHistory,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: validWatchHistory.length,
+        pages: Math.ceil(validWatchHistory.length / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching watch history:', error);
+    res.status(500).json({ message: 'Error fetching watch history', error });
+  }
+};
+
+// Clear watch history
+export const clearWatchHistory: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    user.watchHistory = [];
+    await user.save();
+
+    res.json({ message: 'Watch history cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing watch history:', error);
+    res.status(500).json({ message: 'Error clearing watch history', error });
+  }
+};
+
+// Remove specific video from watch history
+export const removeFromWatchHistory: RequestHandler = async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const userId = (req as any).user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    user.watchHistory = user.watchHistory.filter(
+      item => item.video.toString() !== videoId
+    );
+
+    await user.save();
+
+    res.json({ message: 'Video removed from watch history' });
+  } catch (error) {
+    console.error('Error removing from watch history:', error);
+    res.status(500).json({ message: 'Error removing from watch history', error });
   }
 };

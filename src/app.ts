@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import videoRoutes from './routes/video.routes';
+import commentRoutes from './routes/comment.routes';
 import cors from 'cors'
 
 dotenv.config();
@@ -19,6 +20,7 @@ app.use(cors({
 app.use('/api/auth', authRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/videos', videoRoutes);
+app.use('/api/comments', commentRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/', {dbName: process.env.DB_NAME || "video-sharing"})

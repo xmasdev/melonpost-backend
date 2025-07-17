@@ -1,12 +1,19 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export interface IWatchHistoryItem {
+  video: mongoose.Types.ObjectId;
+  watchedAt: Date;
+  watchDuration: number; // in seconds, how much of the video was watched
+}
+
 export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
   avatar: string;
+  watchHistory: IWatchHistoryItem[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +41,21 @@ const userSchema = new Schema({
     type: String,
     default: '', // Will store the avatar URL
   },
+  watchHistory: [{
+    video: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Video',
+      required: true
+    },
+    watchedAt: {
+      type: Date,
+      default: Date.now
+    },
+    watchDuration: {
+      type: Number,
+      default: 0
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now,

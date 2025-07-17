@@ -9,6 +9,7 @@ export interface IVideo extends Document {
   uploader: string,
   views: number;
   likes: number;
+  commentsCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +46,10 @@ const VideoSchema = new Schema({
     default: 0
   },
   likes: {
+    type: Number,
+    default: 0
+  },
+  commentsCount: {
     type: Number,
     default: 0
   }
